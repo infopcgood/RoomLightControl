@@ -1,18 +1,21 @@
 #include <Arduino.h>
+#include <FastLED.h>
 
-// put function declarations here:
-int myFunction(int, int);
+#define NUM_LEDS 200
+#define DATA_PIN 4
+
+CRGB leds[NUM_LEDS];
 
 void setup() {
-  // put your setup code here, to run once:
-  int result = myFunction(2, 3);
+    FastLED.addLeds<WS2812B, DATA_PIN, GRB>(leds, NUM_LEDS);
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
-}
-
-// put function definitions here:
-int myFunction(int x, int y) {
-  return x + y;
+    for(int i = 0; i < NUM_LEDS; i++) {
+        for(int j = 0; j <= i; j++) {
+            leds[i-j] = (j/3)%3 == 0 ? CRGB::Red : (j/3)%3 == 1 ? CRGB::Green : CRGB::Blue;
+        }
+    }
+    FastLED.show();
+    delay(500);
 }
