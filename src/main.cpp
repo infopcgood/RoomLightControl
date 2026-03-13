@@ -43,6 +43,7 @@ void loop() {
                 memcpy(packet + 4, DEVICE_NAME, sizeof(DEVICE_NAME));
                 Udp.beginPacket(Udp.remoteIP(), Udp.remotePort());
                 Udp.write(packet, 5 + sizeof(DEVICE_NAME));
+                Udp.endPacket();
                 free(packet);
                 break;
             }
