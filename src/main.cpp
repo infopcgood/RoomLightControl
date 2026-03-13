@@ -1,26 +1,69 @@
 #include <Arduino.h>
 #include <FastLED.h>
 #include <ESP8266WiFi.h>
+#include <WiFiUdp.h>
 
 #include "defines.h"
 
+WiFiUDP Udp;
+
 CRGB leds[NUM_LEDS];
+char packetBuffer[UDP_TX_PACKET_MAX_SIZE];
 
 void setup() {
-    WiFi.begin("")
+    WiFi.hostname(DEVICE_NAME);
+    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+
+    while (WiFi.status() != WL_CONNECTED)
+    {
+        delay(500);
+    }
+
+    Udp.begin(UDP_PORT);
 
     FastLED.addLeds<WS2812B, DATA_PIN, GRB>(leds, NUM_LEDS);
 }
 
 void loop() {
-    // Make the LEDs continuously strobe between ffc400 and 00ffd0 for every 40 led with an interval of 2s using the HSV color space to achieve a smooth transition between the colors.
-    // Smoothly transition between the colors using the HSV color space to achieve a smooth transition between the colors.
-    for (int i = 0; i < NUM_LEDS; i++) {
-        // Calculate the hue value based on the LED index and the current time
-        uint8_t hue = (i * 256 / NUM_LEDS + millis() / 20) % 256;
-        leds[i] = CHSV(hue, 255, 255); // Set the LED color using HSV
-    }
-    FastLED.show();
-    delay(20); // Delay to control the speed of the color transition
+    int packetSize = Udp.parsePacket();
+    if (packetSize) {
+        int len = Udp.read(packetBuffer, UDP_TX_PACKET_MAX_SIZE);
+        if (len > 0) {
+            packetBuffer[len] = 0;
+        }
 
+        switch (packetBuffer[0]) {
+            case 'p': 
+                // ping, return pong with device information
+                char* packet;
+                packet = (char*) malloc(sizeof(char) * (4 + sizeof(DEVICE_NAME)));
+                packet[0] = (NUM_LEDS >> 8) & 0xFF;
+                packet[1] = NUM_LEDS & 0xFF;
+                packet[2] = DATA_PIN;
+                packet[3] = sizeof(DEVICE_NAME);
+                memcpy(packet + 4, DEVICE_NAME, sizeof(DEVICE_NAME));
+                Udp.beginPacket(Udp.remoteIP(), Udp.remotePort());
+                Udp.write(packet, 4 + sizeof(DEVICE_NAME));
+                free(packet);
+                break;
+
+            case 'u':
+                // update LEDs.
+                // packet format: u [led count (2 bytes)] ( [led index (2 bytes)] [R] [G] [B] ) * n
+                for (int i = 1; i < len; i += 7) {
+                    int ledIndex = (packetBuffer[i] << 8) | packetBuffer[i + 1];
+                    if (ledIndex < NUM_LEDS) {
+                        leds[ledIndex] = CRGB(packetBuffer[i + 2], packetBuffer[i + 3], packetBuffer[i + 4]);
+                    }
+                }
+                FastLED.show();
+                break;
+            
+            case 'c':
+                // clear LEDs
+                FastLED.clear();
+                FastLED.show();
+                break;
+        }
+    }
 }
