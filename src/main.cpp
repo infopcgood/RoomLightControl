@@ -35,22 +35,21 @@ void loop() {
         switch (packetBuffer[0]) {
             case 'p': 
                 // ping, return pong with device information
-                char* packet;
-                packet = (char*) malloc(sizeof(char) * (4 + sizeof(DEVICE_NAME)));
+                char* packet = (char*) calloc(sizeof(char) * (5 + sizeof(DEVICE_NAME)), sizeof(char));
                 packet[0] = (NUM_LEDS >> 8) & 0xFF;
                 packet[1] = NUM_LEDS & 0xFF;
                 packet[2] = DATA_PIN;
                 packet[3] = sizeof(DEVICE_NAME);
                 memcpy(packet + 4, DEVICE_NAME, sizeof(DEVICE_NAME));
                 Udp.beginPacket(Udp.remoteIP(), Udp.remotePort());
-                Udp.write(packet, 4 + sizeof(DEVICE_NAME));
+                Udp.write(packet, 5 + sizeof(DEVICE_NAME));
                 free(packet);
                 break;
 
             case 'u':
                 // update LEDs.
-                // packet format: u [led count (2 bytes)] ( [led index (2 bytes)] [R] [G] [B] ) * n
-                for (int i = 1; i < len; i += 7) {
+                // packet format: u ( [led index (2 bytes)] [R] [G] [B] ) * n
+                for (int i = 1; i < len; i += 5) {
                     int ledIndex = (packetBuffer[i] << 8) | packetBuffer[i + 1];
                     if (ledIndex < NUM_LEDS) {
                         leds[ledIndex] = CRGB(packetBuffer[i + 2], packetBuffer[i + 3], packetBuffer[i + 4]);
@@ -58,7 +57,7 @@ void loop() {
                 }
                 FastLED.show();
                 break;
-            
+
             case 'c':
                 // clear LEDs
                 FastLED.clear();
