@@ -1,12 +1,14 @@
 #include <Arduino.h>
 #include <FastLED.h>
+#include <ESP8266WiFi.h>
 
-#define NUM_LEDS 209
-#define DATA_PIN 4
+#include "defines.h"
 
 CRGB leds[NUM_LEDS];
 
 void setup() {
+    WiFi.begin("")
+
     FastLED.addLeds<WS2812B, DATA_PIN, GRB>(leds, NUM_LEDS);
 }
 
@@ -20,5 +22,5 @@ void loop() {
     }
     FastLED.show();
     delay(20); // Delay to control the speed of the color transition
-    
+
 }
