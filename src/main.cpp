@@ -33,7 +33,7 @@ void loop() {
         }
 
         switch (packetBuffer[0]) {
-            case 'p': 
+            case 'p': {
                 // ping, return pong with device information
                 char* packet = (char*) calloc(sizeof(char) * (5 + sizeof(DEVICE_NAME)), sizeof(char));
                 packet[0] = (NUM_LEDS >> 8) & 0xFF;
@@ -45,8 +45,8 @@ void loop() {
                 Udp.write(packet, 5 + sizeof(DEVICE_NAME));
                 free(packet);
                 break;
-
-            case 'u':
+            }
+            case 'u': {
                 // update LEDs.
                 // packet format: u ( [led index (2 bytes)] [R] [G] [B] ) * n
                 for (int i = 1; i < len; i += 5) {
@@ -57,12 +57,14 @@ void loop() {
                 }
                 FastLED.show();
                 break;
+            }
 
-            case 'c':
+            case 'c': {
                 // clear LEDs
                 FastLED.clear();
                 FastLED.show();
                 break;
+            }
         }
     }
 }
