@@ -15,7 +15,8 @@ void loop() {
         for(int j = 0; j <= i; j++) {
             leds[i-j] = (j/3)%3 == 0 ? CRGB::Red : (j/3)%3 == 1 ? CRGB::Green : CRGB::Blue;
         }
+        FastLED.show();
+        delay(500);
     }
-    FastLED.show();
-    delay(500);
+    delay(2000);
 }
