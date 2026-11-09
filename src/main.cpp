@@ -58,6 +58,58 @@ static void scanAndPrintNetworks() {
     WiFi.scanDelete();
 }
 
+static const char* disconnectReasonName(int reason) {
+    switch (reason) {
+        case 2:   return "AUTH_EXPIRE - auth timed out (often a wrong password, or the router needs WPA3/PMF)";
+        case 4:   return "ASSOC_EXPIRE - router stopped answering the association";
+        case 5:   return "ASSOC_TOOMANY - router has too many clients";
+        case 6:   return "NOT_AUTHED";
+        case 7:   return "NOT_ASSOCED";
+        case 8:   return "ASSOC_LEAVE - this board disconnected itself (normal before a network scan)";
+        case 15:  return "4WAY_HANDSHAKE_TIMEOUT - wrong password";
+        case 18:
+        case 19:
+        case 24:  return "CIPHER rejected - set the router's 2.4 GHz security to WPA2-PSK (AES)";
+        case 20:
+        case 21:
+        case 22:  return "Security mode not supported - router probably needs WPA3/PMF; set it to WPA2-PSK only";
+        case 23:  return "802.1X auth failed - enterprise networks are not supported";
+        case 200: return "BEACON_TIMEOUT - signal lost";
+        case 201: return "NO_AP_FOUND - network not visible";
+        case 202: return "AUTH_FAIL - wrong password, or router refused this device (access control / blocklist)";
+        case 203: return "ASSOC_FAIL - router refused to associate (access control, blocklist, or Wi-Fi 6 / PMF settings)";
+        case 204: return "HANDSHAKE_TIMEOUT - wrong password";
+        default:  return "see WiFiDisconnectReason in ESP8266WiFiType.h";
+    }
+}
+
+static WiFiEventHandler onWifiConnected;
+static WiFiEventHandler onWifiDisconnected;
+static WiFiEventHandler onWifiGotIP;
+static int lastDisconnectReason = -1;
+static unsigned int disconnectRepeats = 0;
+
+static void registerWifiEventLogging() {
+    onWifiConnected = WiFi.onStationModeConnected([](const WiFiEventStationModeConnected& e) {
+        Serial.printf("[WiFi] Associated with \"%s\" on channel %d - waiting for an IP from DHCP...\n",
+                      e.ssid.c_str(), e.channel);
+    });
+    onWifiDisconnected = WiFi.onStationModeDisconnected([](const WiFiEventStationModeDisconnected& e) {
+        int reason = (int) e.reason;
+        // The SDK retries every few seconds; only log new reasons, plus every 10th repeat.
+        if (reason != lastDisconnectReason || ++disconnectRepeats % 10 == 0) {
+            Serial.printf("[WiFi] Disconnected, reason %d: %s\n", reason, disconnectReasonName(reason));
+            if (reason != lastDisconnectReason) {
+                disconnectRepeats = 0;
+            }
+            lastDisconnectReason = reason;
+        }
+    });
+    onWifiGotIP = WiFi.onStationModeGotIP([](const WiFiEventStationModeGotIP& e) {
+        Serial.printf("[WiFi] Got IP %s (gateway %s)\n", e.ip.toString().c_str(), e.gw.toString().c_str());
+    });
+}
+
 static void showStatusLed(const CRGB& color) {
     leds[0] = color;
     FastLED.show();
@@ -79,7 +131,14 @@ void setup() {
 
     WiFi.persistent(false);
     WiFi.mode(WIFI_STA);
+#ifdef WIFI_FORCE_11G
+    // Workaround for routers that reject the ESP8266 in 802.11n / Wi-Fi 6 mode.
+    // Enable by adding  #define WIFI_FORCE_11G  to defines.h.
+    WiFi.setPhyMode(WIFI_PHY_MODE_11G);
+    Serial.println("[WiFi] Forcing 802.11g mode (WIFI_FORCE_11G)");
+#endif
     WiFi.hostname(DEVICE_NAME);
+    registerWifiEventLogging();
     Serial.printf("[WiFi] Connecting to \"%s\" (password length %u)\n",
                   WIFI_SSID, (unsigned) strlen(WIFI_PASSWORD));
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
